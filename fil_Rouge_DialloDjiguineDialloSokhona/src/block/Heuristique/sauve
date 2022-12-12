@@ -1,0 +1,118 @@
+package test;
+
+import block.BlockActionablWord;
+import block.BlockRegularWord;
+import block.Heuristique.HeuristiqueGoalSucces;
+import block.Optimiseur;
+import csp.BacktrackSolver;
+import csp.DomainSizeVariableHeuristic;
+import csp.HeuristicMACSolver;
+import csp.RandomValueHeuristic;
+import planning.*;
+import representation.Constraint;
+import representation.Variable;
+import vue.VuePlan;
+
+import java.io.IOException;
+import java.util.*;
+
+public class Plannerstests {
+    public static void main(String[] args) throws IOException {
+        int nbBlock = 6;
+        int nbPile = 4;
+        BlockActionablWord model = new BlockActionablWord(nbBlock, nbPile);
+        System.out.println(model.getAllVariables());
+        Set<Constraint> constraints = new HashSet<>(model.getConstraints());
+        constraints.addAll(model.getConstraints());
+
+        //initial state build
+        Map<Variable, Object> initialeState = new HashMap<>();
+        Variable lastBlock;
+        for (Variable variable : model.getFixeBlocks()) {
+            initialeState.put(variable, false);
+
+        }
+        for (Variable variable : model.getFreePiles()) {
+            initialeState.put(variable, true);
+        }
+        //initial State Build
+        /*
+        lastBlock = model.getRegisters().get("on0");
+        initialeState.put(lastBlock, -1);
+        initialeState.put(model.getRegisters().get("free-1"), false);
+        for (int i = 1; i < nbBlock; i++) {
+            Variable variable = model.getRegisters().get("on" + i);
+            initialeState.put(variable, model.getIndice(lastBlock));
+            initialeState.put(model.getRegisters().get("fixed" + model.getIndice(lastBlock)), true);
+            lastBlock = variable;
+            System.out.println("lastVar"+lastBlock);
+        }
+        */
+
+
+        BlockRegularWord builderinitialState = new BlockRegularWord(nbBlock, 1);
+        Set<Constraint> constraintsb = new HashSet<>();
+        constraintsb.addAll(builderinitialState.getConstraints());
+        constraintsb.addAll(builderinitialState.getImplicationConstraints());
+
+
+        BacktrackSolver backtrackSolver = new BacktrackSolver(builderinitialState.getAllVariables(),constraintsb);
+        HeuristicMACSolver heuristicMACSolverSolver = new HeuristicMACSolver(builderinitialState.getAllVariables(),constraintsb,new DomainSizeVariableHeuristic(true),new RandomValueHeuristic(new Random()));
+
+        Map<Variable, Object> solution = backtrackSolver.solve();
+        //Map<Variable, Object> solution = heuristicMACSolverSolver.solve();
+
+        for (Variable variable: solution.keySet()){
+            initialeState.put(variable,solution.get(variable));
+        }
+
+        for ( Variable variable: initialeState.keySet()){
+            if (variable.getName().split("")[0].equals("o"))
+                System.out.println(variable.getName()+"--->"+initialeState.get(variable));
+        }
+
+        //Goal build
+        HashMap gol = new HashMap<>();
+        gol.put(model.getRegisters().get("on2"), -1);
+        gol.put(model.getRegisters().get("on0"), 1);
+        gol.put(model.getRegisters().get("on3"), -3);
+        gol.put(model.getRegisters().get("on5"), 3);
+        gol.put(model.getRegisters().get("on4"), 5);
+
+        Goal goals = new BasicGoal(gol);
+
+        //recherche plan
+        System.out.println("--------------------$$$$$$$$$$$$$");
+        BFSPlanner bfsPlanner = new BFSPlanner(initialeState, model.getAction(), goals,new Optimiseur(model));
+        DFSPlanner dfsPlanner = new DFSPlanner(initialeState, model.getAction(), goals);
+        DijkstraPlanner dijkstraPlanner = new DijkstraPlanner(initialeState, model.getAction(), goals,new Optimiseur(model));
+        AStarPlanner astarPlanner = new AStarPlanner(initialeState, model.getAction(), goals,new HeuristiqueGoalPlace(goals), new Optimiseur(model));
+
+        List<Planner> planerList = new ArrayList<>();
+        //planerList.add(bfsPlanner);
+        //planerList.add(dijkstraPlanner);
+        planerList.add(astarPlanner);
+        for (Planner planner: planerList){
+            System.out.println("bing");
+            long start = System.currentTimeMillis();
+            List<Action> resultat = planner.plan();
+            long end = System.currentTimeMillis();
+            float time =end-start;
+            int poidSolution = 0;
+            if (resultat != null) {
+                for (Action action : resultat) {
+                    poidSolution += action.getCost();
+                }
+            }
+
+            System.out.println("\n["+planner.getName()+"] noud visité =          " + planner.getSonde());
+            System.out.println("["+planner.getName()+"] time of execution=       " + (end - start)/60);
+            System.out.println("["+planner.getName()+"]chemin size =            " + (resultat != null ? resultat.size() : 0));
+            System.out.println("["+planner.getName()+"] poid de la solution=     " + poidSolution);
+
+            VuePlan vuePlan = new VuePlan(planner.getName(),nbBlock, nbPile, initialeState, resultat, model.getRegisters(),time);
+            vuePlan.start ();
+
+        }
+    }
+}
